@@ -1,0 +1,44 @@
+{
+  "venueName": "The Great Theater",
+  "sections": [
+    {
+      "sectionId": "Orchestra",
+      "description": "Ground floor seating closest to the stage.",
+      "rows": [
+        {
+          "rowNumber": "A",
+          "seats": [
+            {
+              "seatNumber": "1",
+              "price": 150,
+              "status": "available"
+            },
+            {
+              "seatNumber": "2",
+              "price": 150,
+              "status": "booked"
+            },
+            {
+              "seatNumber": "3",
+              "price": 150,
+              "status": "available"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "nonSeatingAreas": [
+    {
+      "areaId": "Stage",
+      "description": "Main stage for performances",
+      "geometry": {
+        "x": 100,
+        "y": 50,
+        "width": 300,
+        "height": 100,
+        "rotation": 0
+      }
+    }
+  ]
+}
