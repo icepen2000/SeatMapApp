@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
 import Seat from './Seat';
 import { Dimensions, PixelRatio } from 'react-native';
-import { PinchGestureHandler, State } from 'react-native-gesture-handler';
+import { PinchGestureHandler } from 'react-native-gesture-handler';
 
 const windowWidth = Dimensions.get('window').width;
 const windowHeight = Dimensions.get('window').height;
@@ -11,18 +11,7 @@ const pixelRatio = PixelRatio.get();
 const SeatMap = ({ venueName, sections = [] }) => {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const scale = useRef(new Animated.Value(1));
-
   const onPinchEvent = Animated.event([{ nativeEvent: { scale: scale.current } }], { useNativeDriver: true });
-
-  const onPinchStateChange = event => {
-    if (event.nativeEvent.oldState === State.ACTIVE) {
-      Animated.spring(scale.current, {
-        toValue: 1,
-        useNativeDriver: true,
-        bounciness: 1
-      }).start();
-    }
-  };
 
   const handleSeatSelect = (sectionId, rowNumber, seatNumber) => {
     const seatId = `${sectionId}-${rowNumber}-${seatNumber}`;
@@ -52,9 +41,14 @@ const SeatMap = ({ venueName, sections = [] }) => {
   };
 
   return (
-    <PinchGestureHandler onGestureEvent={onPinchEvent} onHandlerStateChange={onPinchStateChange}>
+    <PinchGestureHandler onGestureEvent={onPinchEvent}>
       <Animated.View style={{ flex: 1, transform: [{ scale: scale.current }] }}>
-        <ScrollView maximumZoomScale={3} minimumZoomScale={1} style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.contentContainer}
+          maximumZoomScale={3}
+          minimumZoomScale={1}
+        >
           <View style={styles.mapContainer}>
             <Text style={styles.venueName}>{venueName}</Text>
             {sections.map((section) => (
@@ -91,20 +85,22 @@ const SeatMap = ({ venueName, sections = [] }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  scrollView: {
     flex: 1,
+    backgroundColor: 'white', // Optional: to see the ScrollView area
   },
   contentContainer: {
     flexGrow: 1,
+    //justifyContent: 'center', // This should vertically center your content if your ScrollView has the correct height
     alignItems: 'center',
-    justifyContent: 'center',
+    minHeight: windowHeight, // Ensure it's at least the height of the window
   },
   mapContainer: {
-    flex: 1,
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
     width: '100%',
     position: 'relative',
+    marginTop: 10,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
   },
   venueName: {
     fontSize: 20,
