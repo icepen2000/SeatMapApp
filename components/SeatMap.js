@@ -1,16 +1,32 @@
-import React, { useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
 import Seat from './Seat';
+import { Dimensions, PixelRatio } from 'react-native';
+import { PinchGestureHandler, State } from 'react-native-gesture-handler';
 
-const SeatMap = ({ sections = [], nonSeatingAreas = [] }) => {
+const windowWidth = Dimensions.get('window').width;
+const windowHeight = Dimensions.get('window').height;
+const pixelRatio = PixelRatio.get();
+
+const SeatMap = ({ venueName, sections = [] }) => {
   const [selectedSeats, setSelectedSeats] = useState([]);
+  const scale = useRef(new Animated.Value(1));
 
-  // Debugging data
-  console.log("Sections data:", sections);
-  console.log("Non-seating areas:", nonSeatingAreas);
+  const onPinchEvent = Animated.event([{ nativeEvent: { scale: scale.current } }], { useNativeDriver: true });
+
+  const onPinchStateChange = event => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      Animated.spring(scale.current, {
+        toValue: 1,
+        useNativeDriver: true,
+        bounciness: 1
+      }).start();
+    }
+  };
 
   const handleSeatSelect = (sectionId, rowNumber, seatNumber) => {
     const seatId = `${sectionId}-${rowNumber}-${seatNumber}`;
+    console.log('Seat clicked:', seatId);
     setSelectedSeats(prevSelectedSeats => {
       return prevSelectedSeats.includes(seatId)
         ? prevSelectedSeats.filter(id => id !== seatId)
@@ -18,100 +34,95 @@ const SeatMap = ({ sections = [], nonSeatingAreas = [] }) => {
     });
   };
 
-  if (!sections || sections.length === 0) {
-    return <Text style={styles.noSectionsText}>No sections available.</Text>;
-  }
+  const calculateSeatStyle = (geometry, sectionId, rowNumber, seatNumber) => {
+    if (!geometry) {
+      console.error(`Geometry missing for seat ${sectionId}-${rowNumber}-${seatNumber}`);
+      return {};
+    }
+    const { x, y, width, height, rotation, color } = geometry;
+    return {
+      position: 'absolute',
+      left: x,
+      top: y,
+      width: width,
+      height: height,
+      transform: [{ rotate: `${rotation}rad` }],
+      backgroundColor: selectedSeats.includes(`${sectionId}-${rowNumber}-${seatNumber}`) ? 'blue' : `rgb(${color.r}, ${color.g}, ${color.b})`,
+    };
+  };
 
   return (
-    <ScrollView style={styles.scrollViewStyle} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.mapContainer}>
-        {sections.map((section) => (
-          <View
-            key={section.sectionId}
-            style={styles.section}>
-            <Text style={styles.sectionTitle}>Section {section.sectionId}</Text>
-            {section.rows.map((row) => (
-              <View
-                key={row.rowNumber}
-                style={styles.row}>
-                {row.seats.map((seat) => (
-                  <Seat
-                    key={`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`}
-                    id={`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`}
-                    price={seat.price}
-                    status={seat.status}
-                    onSeatSelect={() => handleSeatSelect(section.sectionId, row.rowNumber, seat.seatNumber)}
-                    selected={selectedSeats.includes(`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`)}
-                  />
+    <PinchGestureHandler onGestureEvent={onPinchEvent} onHandlerStateChange={onPinchStateChange}>
+      <Animated.View style={{ flex: 1, transform: [{ scale: scale.current }] }}>
+        <ScrollView maximumZoomScale={3} minimumZoomScale={1} style={styles.container} contentContainerStyle={styles.contentContainer}>
+          <View style={styles.mapContainer}>
+            <Text style={styles.venueName}>{venueName}</Text>
+            {sections.map((section) => (
+              <View key={section.sectionId}>
+                {section.rows.map((row) => (
+                  <View key={row.rowNumber}>
+                    {row.seats.map((seat) => (
+                      <View
+                        key={`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`}
+                        style={calculateSeatStyle(seat.geometry, section.sectionId, row.rowNumber, seat.seatNumber)}
+                        onStartShouldSetResponder={() => true}
+                        onResponderGrant={() => handleSeatSelect(section.sectionId, row.rowNumber, seat.seatNumber)}
+                      >
+                        <Seat
+                          id={`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`}
+                          price={seat.price}
+                          status={seat.status}
+                          geometry={seat.geometry}
+                          selected={selectedSeats.includes(`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`)}
+                          onSeatSelect={() => handleSeatSelect(section.sectionId, row.rowNumber, seat.seatNumber)} // Ensuring correct prop usage
+                        />
+                      </View>
+                    ))}
+                  </View>
                 ))}
               </View>
             ))}
+
           </View>
-        ))}
-        {nonSeatingAreas.map((area) => (
-          <View key={area.areaId} style={[styles.nonSeatingArea, {
-            left: area.geometry.x,
-            top: area.geometry.y,
-            width: area.geometry.width,
-            height: area.geometry.height,
-            transform: [{ rotate: `${area.geometry.rotation}deg` }]
-          }]}>
-            <Text style={styles.areaText}>{area.areaId}</Text>
-          </View>
-        ))}
-      </View>
-    </ScrollView>
+        </ScrollView>
+      </Animated.View>
+    </PinchGestureHandler>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollViewStyle: {
-    flex: 1  // Full height of the container
+  container: {
+    flex: 1,
   },
   contentContainer: {
-    paddingVertical: 20,  // Adds vertical padding inside the scroll view
-    minHeight: 1000, // Ensure there's enough vertical space for absolute items
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mapContainer: {
-    alignItems: 'center',  // Aligns sections in the center
-    width: '100%',  // Full width to accommodate all sections
-    position: 'relative', // Required for absolute positioning of non-seating areas
+    flex: 1,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    width: '100%',
+    position: 'relative',
   },
-  section: {
-    marginBottom: 20,  // Adds space between each section
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 10
-  },
-  sectionTitle: {
-    fontSize: 16,
+  venueName: {
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10  // Space between the title and the rows
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 5
-  },
-  nonSeatingArea: {
-    position: 'absolute',
-    backgroundColor: 'rgba(68, 68, 68, 0.8)',  // Semi-transparent dark gray for visibility
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderColor: '#666',
-    borderWidth: 1,
-    zIndex: 1000  // Ensure it's on top of other components
-  },
-  areaText: {
-    color: 'white',
-    fontWeight: 'bold'
+    marginBottom: 10,
+    textAlign: 'center',
   },
   noSectionsText: {
     fontSize: 18,
     color: 'red',
     textAlign: 'center',
-    marginTop: 20
-  }
+    marginTop: 20,
+  },
+  seatWrapper: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 
 export default SeatMap;

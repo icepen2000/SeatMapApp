@@ -1,44 +1,118 @@
 {
-  "venueName": "The Great Theater",
+  "venueName": "TOM THEATER 2관_3",
   "sections": [
     {
-      "sectionId": "Orchestra",
+      "sectionId": "C구역",
       "description": "Ground floor seating closest to the stage.",
       "rows": [
         {
-          "rowNumber": "A",
+          "rowNumber": "2",
           "seats": [
             {
-              "seatNumber": "1",
+              "seatNumber": "03",
               "price": 150,
-              "status": "available"
+              "status": "available",
+              "geometry": {
+                "x": 10.0,
+                "y": 88.0,
+                "width": 120.0,
+                "height": 60.0,
+                "rotation": -0.5235987833701112,
+                "color": {
+                  "r": 8.223749566823244,
+                  "g": 255.0,
+                  "b": 3.1875000474974513
+                }
+              }
             },
             {
-              "seatNumber": "2",
+              "seatNumber": "02",
               "price": 150,
-              "status": "booked"
+              "status": "available",
+              "geometry": {
+                "x": 174.0,
+                "y": 0.0,
+                "width": 120.0,
+                "height": 60.0,
+                "rotation": 0,
+                "color": {
+                  "r": 255.0,
+                  "g": 5.312500158324838,
+                  "b": 5.312500158324838
+                }
+              }
             },
             {
-              "seatNumber": "3",
+              "seatNumber": "04",
               "price": 150,
-              "status": "available"
+              "status": "available",
+              "geometry": {
+                "x": 10.0,
+                "y": 316.0,
+                "width": 68.0,
+                "height": 152.0,
+                "rotation": 0,
+                "color": {
+                  "r": 217.0000022649765,
+                  "g": 217.0000022649765,
+                  "b": 217.0000022649765
+                }
+              }
+            },
+            {
+              "seatNumber": "01",
+              "price": 150,
+              "status": "available",
+              "geometry": {
+                "x": 10.0,
+                "y": 0.0,
+                "width": 120.0,
+                "height": 60.0,
+                "rotation": 0,
+                "color": {
+                  "r": 217.0000022649765,
+                  "g": 217.0000022649765,
+                  "b": 217.0000022649765
+                }
+              }
+            },
+            {
+              "seatNumber": "05",
+              "price": 150,
+              "status": "available",
+              "geometry": {
+                "x": 160.0,
+                "y": 88.0,
+                "width": 120.0,
+                "height": 60.0,
+                "rotation": 0.5235987833701112,
+                "color": {
+                  "r": 5.312500158324838,
+                  "g": 60.24374954402447,
+                  "b": 255.0
+                }
+              }
+            },
+            {
+              "seatNumber": "07",
+              "price": 150,
+              "status": "available",
+              "geometry": {
+                "x": 10.0,
+                "y": 215.0,
+                "width": 284.0,
+                "height": 60.0,
+                "rotation": 0,
+                "color": {
+                  "r": 217.0000022649765,
+                  "g": 217.0000022649765,
+                  "b": 217.0000022649765
+                }
+              }
             }
           ]
         }
       ]
-    }
-  ],
-  "nonSeatingAreas": [
-    {
-      "areaId": "Stage",
-      "description": "Main stage for performances",
-      "geometry": {
-        "x": 100,
-        "y": 50,
-        "width": 300,
-        "height": 100,
-        "rotation": 0
-      }
     }
   ]
 }
