@@ -1,6 +1,7 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Dimensions, TouchableWithoutFeedback } from 'react-native';
-import { PinchGestureHandler, State } from 'react-native-gesture-handler';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Dimensions, ScrollView, TouchableWithoutFeedback } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, useAnimatedGestureHandler, withSpring, runOnJS } from 'react-native-reanimated';
+import { PanGestureHandler, PinchGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Seat from './Seat';
 
 const windowWidth = Dimensions.get('window').width;
@@ -11,41 +12,60 @@ const MAX_SCALE = 2; // 최대 스케일 값
 
 const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const scale = useRef(new Animated.Value(1)).current;
   const [lastScale, setLastScale] = useState(1);
+  const scale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
   const [contentWidth, setContentWidth] = useState(windowWidth * 3);
   const [contentHeight, setContentHeight] = useState(windowHeight * 2);
-  const scrollViewRef = useRef(null);
-  const scrollViewRef2 = useRef(null);
 
-  const onPinchEvent = Animated.event(
-    [{ nativeEvent: { scale: scale } }],
-    {
-      useNativeDriver: true,
-      listener: (event) => {
-        //console.log('Pinch event:', event.nativeEvent);
-      }
-    }
-  );
+  const contentWidthRef = useRef(windowWidth);
+  const contentHeightRef = useRef(windowHeight);
 
-  const onPinchStateChange = event => {
-    //console.log('Pinch state change:', event.nativeEvent);
-    if (event.nativeEvent.oldState === State.ACTIVE) {
-      let newScale = lastScale * event.nativeEvent.scale;
-      if (newScale < MIN_SCALE) {
-        newScale = MIN_SCALE;
-      }
-      if (newScale > MAX_SCALE) {
-        newScale = MAX_SCALE;
-      }
-      setLastScale(newScale);
-      scale.setValue(newScale);
+  const pinchGestureHandler = useAnimatedGestureHandler({
+    onStart: (_, ctx) => {
+      //console.log('pinch-->onStart');
+      ctx.startScale = scale.value;
+    },
+    onActive: (event, ctx) => {
+      //console.log('pinch-->onActive');
+      scale.value = Math.min(Math.max(ctx.startScale * event.scale, MIN_SCALE), MAX_SCALE);
+    },
+    onEnd: () => {
+      //console.log('pinch-->onEnd');
+      runOnJS(setLastScale)(scale.value);
     }
-  };
+  });
+
+  const panGestureHandler = useAnimatedGestureHandler({
+    onStart: (_, ctx) => {
+      //console.log('pan-->onStart');
+      ctx.startX = translateX.value;
+      ctx.startY = translateY.value;
+    },
+    onActive: (event, ctx) => {
+      //console.log('pan-->onActive');
+      translateX.value = ctx.startX + event.translationX;
+      translateY.value = ctx.startY + event.translationY;
+    },
+    onEnd: () => {
+      //console.log('pan-->onEnd');
+    }
+  });
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { scale: withSpring(scale.value, { stiffness: 100, damping: 15 }) },
+        { translateX: withSpring(translateX.value, { stiffness: 100, damping: 15 }) },
+        { translateY: withSpring(translateY.value, { stiffness: 100, damping: 15 }) }
+      ]
+    };
+  });
 
   const handleSeatSelect = (sectionId, rowNumber, seatNumber) => {
     const seatId = `${sectionId}-${rowNumber}-${seatNumber}`;
-    console.log('Seat clicked:', seatId);
+    //console.log('Seat clicked:', seatId);
     setSelectedSeats(prevSelectedSeats => (
       prevSelectedSeats.includes(seatId)
         ? prevSelectedSeats.filter(id => id !== seatId)
@@ -53,7 +73,7 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
     ));
   };
 
-  const calculateSeatStyle = (geometry, sectionId, rowNumber, seatNumber) => {
+  const calculateSeatStyle = useCallback((geometry, sectionId, rowNumber, seatNumber) => {
     if (!geometry) {
       return {};
     }
@@ -67,9 +87,9 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
       transform: [{ rotate: `${rotation}rad` }],
       backgroundColor: selectedSeats.includes(`${sectionId}-${rowNumber}-${seatNumber}`) ? 'blue' : `rgb(${color.r}, ${color.g}, ${color.b})`,
     };
-  };
+  }, [selectedSeats]);
 
-  const calculateNonSeatStyle = (geometry) => {
+  const calculateNonSeatStyle = useCallback((geometry) => {
     if (!geometry) {
       return {};
     }
@@ -82,10 +102,10 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
       height: height,
       transform: [{ rotate: `${rotation}rad` }],
       backgroundColor: `rgb(${color.r}, ${color.g}, ${color.b})`,
-      alignItems: 'center', // Center the content horizontally
-      justifyContent: 'center', // Center the content vertically
+      alignItems: 'center',
+      justifyContent: 'center',
     };
-  };
+  }, []);
 
   useEffect(() => {
     let maxContentWidth = windowWidth;
@@ -107,34 +127,29 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
       maxContentHeight = Math.max(maxContentHeight, y + height);
     });
 
-    setContentWidth(maxContentWidth);
-    setContentHeight(maxContentHeight + 70);
+    contentWidthRef.current = maxContentWidth;
+    contentHeightRef.current = maxContentHeight + 70;
   }, [sections, nonSeats]);
 
   return (
-    <PinchGestureHandler onGestureEvent={onPinchEvent} onHandlerStateChange={onPinchStateChange}>
-      <Animated.View style={{ flex: 1, transform: [{ scale: scale }] }}>
-        <ScrollView
-          ref={scrollViewRef}
-          horizontal={true}
-          style={styles.container}
-          contentContainerStyle={{ width: contentWidth * lastScale }}
-          scrollEventThrottle={16}
-        >
-          <ScrollView
-            ref={scrollViewRef2}
-            style={styles.container}
-            contentContainerStyle={{ height: contentHeight * lastScale }}
-            scrollEventThrottle={16}
-          >
-            <View style={[styles.mapContainer, { width: contentWidth * lastScale, height: contentHeight * lastScale }]}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PinchGestureHandler onGestureEvent={pinchGestureHandler}>
+        <Animated.View style={[styles.container, animatedStyle]}>
+          <PanGestureHandler onGestureEvent={panGestureHandler}>
+            <Animated.View style={[styles.mapContainer, { width: contentWidth * lastScale, height: contentHeight * lastScale }]}>
+              {/* 전체 터치 영역 */}
+              <TouchableWithoutFeedback onPress={(e) => {
+                //console.log('Map touched at', e.nativeEvent.locationX, e.nativeEvent.locationY);
+              }}>
+                <View style={[styles.touchLayer, { width: contentWidth * lastScale, height: contentHeight * lastScale }]} />
+              </TouchableWithoutFeedback>
+
               {/* Render non-seats */}
               {nonSeats.map((nonSeat, index) => (
                 <View
                   key={index}
                   style={calculateNonSeatStyle(nonSeat.geometry)}
                 >
-                  {/* Render non-seat name or label if needed */}
                   {nonSeat.name ? (
                     <Text style={styles.nonSeatLabel}>{nonSeat.name}</Text>
                   ) : null}
@@ -147,11 +162,13 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
                   {section.rows.map((row) => (
                     <View key={row.rowNumber}>
                       {row.seats.map((seat) => (
-                        <View
+                        <Animated.View
                           key={`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`}
                           style={calculateSeatStyle(seat.geometry, section.sectionId, row.rowNumber, seat.seatNumber)}
-                          onStartShouldSetResponder={() => true}
-                          onResponderGrant={() => handleSeatSelect(section.sectionId, row.rowNumber, seat.seatNumber)}
+                          onTouchStart={() => {
+                            //console.log(`Touch start at seat: ${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`);
+                            handleSeatSelect(section.sectionId, row.rowNumber, seat.seatNumber);
+                          }}
                         >
                           <Seat
                             id={`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`}
@@ -161,17 +178,17 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
                             selected={selectedSeats.includes(`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`)}
                             onSeatSelect={() => handleSeatSelect(section.sectionId, row.rowNumber, seat.seatNumber)}
                           />
-                        </View>
+                        </Animated.View>
                       ))}
                     </View>
                   ))}
                 </View>
               ))}
-            </View>
-          </ScrollView>
-        </ScrollView>
-      </Animated.View>
-    </PinchGestureHandler>
+            </Animated.View>
+          </PanGestureHandler>
+        </Animated.View>
+      </PinchGestureHandler>
+    </GestureHandlerRootView>
   );
 };
 
@@ -181,6 +198,14 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     position: 'relative',
+  },
+  touchLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'transparent',
   },
   venueName: {
     fontSize: 20,

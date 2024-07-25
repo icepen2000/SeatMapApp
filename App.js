@@ -31,14 +31,14 @@ const App = () => {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
           {sectionsData ? (
-            <SeatMap sections={sectionsData.sections} nonSeatingAreas={sectionsData.nonSeatingAreas} />
-          ) : error ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Text>{error}</Text>
-            </View>
+            <SeatMap
+              venueName={sectionsData.venueName}
+              sections={sectionsData.sections}
+              nonSeats={sectionsData.nonSeats}
+            />
           ) : (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Text>Loading seat map...</Text>
+              <Text>{error || 'Loading seat map...'}</Text>
             </View>
           )}
         </SafeAreaView>
