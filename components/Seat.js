@@ -1,7 +1,7 @@
-import React from 'react';
+import React, {memo} from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 
-const Seat = ({ id, price, status, onSeatSelect, selected, geometry }) => {
+const Seat = memo(({ id, price, status, onSeatSelect, selected, geometry }) => {
   // Check if geometry is defined and has a color property, defaulting to white if not
   const color = geometry?.color || { r: 255, g: 255, b: 255 };
 
@@ -27,7 +27,16 @@ const Seat = ({ id, price, status, onSeatSelect, selected, geometry }) => {
       {/* <Text style={styles.text}>{id}</Text> */}
     </TouchableOpacity>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison function to avoid unnecessary re-renders
+  return (
+    prevProps.id === nextProps.id &&
+    prevProps.selected === nextProps.selected &&
+    prevProps.geometry?.color.r === nextProps.geometry?.color.r &&
+    prevProps.geometry?.color.g === nextProps.geometry?.color.g &&
+    prevProps.geometry?.color.b === nextProps.geometry?.color.b
+  );
+});
 
 const styles = StyleSheet.create({
   text: {

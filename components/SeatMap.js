@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, ScrollView, TouchableWithoutFeedback, Button, Alert } from 'react-native';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, Dimensions, TouchableWithoutFeedback, Button, Alert } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, useAnimatedGestureHandler, withSpring, runOnJS } from 'react-native-reanimated';
 import { PanGestureHandler, PinchGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Seat from './Seat';
@@ -9,8 +9,9 @@ import { getBackendUrl } from '../config'; // Import the getBackendUrl function
 const windowWidth = Dimensions.get('window').width;
 const windowHeight = Dimensions.get('window').height;
 
-const MIN_SCALE = 1;
+const MIN_SCALE = 0.5;
 const MAX_SCALE = 2;
+const TOUCH_THRESHOLD = 15; // 터치와 제스처를 구분하기 위한 임계값 (픽셀 단위)
 
 const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
   const [selectedSeats, setSelectedSeats] = useState([]);
@@ -19,38 +20,45 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const startTouchX = useRef(0);
+  const startTouchY = useRef(0);
   const [contentWidth, setContentWidth] = useState(windowWidth * 3);
   const [contentHeight, setContentHeight] = useState(windowHeight * 2);
   const { websocket } = useWebSocket();
 
   const pinchGestureHandler = useAnimatedGestureHandler({
     onStart: (_, ctx) => {
-      console.log('pinch-->onStart');
+      console.log('pinch gesture started');
       ctx.startScale = scale.value;
     },
     onActive: (event, ctx) => {
-      console.log('pinch-->onActive');
-      scale.value = Math.min(Math.max(ctx.startScale * event.scale, MIN_SCALE), MAX_SCALE);
+       console.log(`Pinch gesture active - Scale: ${event.scale}`);
+       scale.value = Math.min(Math.max(ctx.startScale * event.scale, MIN_SCALE), MAX_SCALE);
     },
     onEnd: () => {
-      console.log('pinch-->onEnd');
-      runOnJS(setLastScale)(scale.value);
+      console.log('pinch gesture ended');
+      if (scale.value < 1) {
+        scale.value = withSpring(1, { stiffness: 100, damping: 15 });
+        runOnJS(setLastScale)(1);
+      } else {
+        runOnJS(setLastScale)(scale.value);
+      }
     }
   });
 
   const panGestureHandler = useAnimatedGestureHandler({
     onStart: (_, ctx) => {
-      console.log('pan-->onStart');
+      console.log('Pan gesture started');
       ctx.startX = translateX.value;
       ctx.startY = translateY.value;
     },
     onActive: (event, ctx) => {
-      console.log('pan-->onActive');
+      console.log(`Pan gesture active - TranslationX: ${event.translationX}, TranslationY: ${event.translationY}`);
       translateX.value = ctx.startX + event.translationX;
       translateY.value = ctx.startY + event.translationY;
     },
     onEnd: () => {
-      console.log('pan-->onEnd');
+      console.log('Pan gesture ended');
     }
   });
 
@@ -64,7 +72,7 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
     };
   });
 
-  const handleSeatSelect = (sectionId, rowNumber, seatNumber, status) => {
+  const handleSeatSelect = useCallback((sectionId, rowNumber, seatNumber, status) => {
     const seatId = `${sectionId}-${rowNumber}-${seatNumber}`;
 
     if (status !== 'booked') {
@@ -74,9 +82,26 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
             : [...prevSelectedSeats, seatId]
         ));
     }
+  },[]);
+
+  const handleTouchStart = (e) => {
+    startTouchX.current = e.nativeEvent.locationX;
+    startTouchY.current = e.nativeEvent.locationY;
   };
 
-  const updateSeatMapState = (updatedSeat) => {
+  const handleTouchEnd = (e, sectionId, rowNumber, seatNumber, status) => {
+    const endTouchX = e.nativeEvent.locationX;
+    const endTouchY = e.nativeEvent.locationY;
+    const distance = Math.sqrt(
+      Math.pow(endTouchX - startTouchX.current, 2) + Math.pow(endTouchY - startTouchY.current, 2)
+    );
+
+    if (distance < TOUCH_THRESHOLD) {
+      handleSeatSelect(sectionId, rowNumber, seatNumber, status);
+    }
+  };
+
+  const updateSeatMapState = useCallback((updatedSeat) => {
     setSeatMapData(prevSeatMapData => {
       return prevSeatMapData.map(section => {
         if (section.sectionId === updatedSeat.sectionId) {
@@ -101,9 +126,9 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
         return section;
       });
     });
-  };
+  }, []);
 
-  const calculateSeatStyle = (geometry, sectionId, rowNumber, seatNumber, status) => {
+  const calculateSeatStyle = useCallback((geometry, sectionId, rowNumber, seatNumber, status) => {
     if (!geometry) {
       return {};
     }
@@ -118,9 +143,9 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
       transform: [{ rotate: `${rotation}rad` }],
       backgroundColor: selectedSeats.includes(`${sectionId}-${rowNumber}-${seatNumber}`) ? 'blue' : backgroundColor,
     };
-  };
+  }, [selectedSeats]);
 
-  const calculateNonSeatStyle = (geometry) => {
+  const calculateNonSeatStyle = useCallback((geometry) => {
     if (!geometry) {
       return {};
     }
@@ -136,7 +161,7 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
       alignItems: 'center',
       justifyContent: 'center',
     };
-  };
+  }, []);
 
   useEffect(() => {
     let maxContentWidth = windowWidth;
@@ -288,4 +313,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SeatMap;
+export default React.memo(SeatMap);
