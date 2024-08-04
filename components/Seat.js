@@ -11,15 +11,18 @@ const Seat = ({ id, price, status, onSeatSelect, selected, geometry }) => {
     justifyContent: 'center',
     margin: 4,
     backgroundColor: selected
-      ? 'blue'
-      : `rgb(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)})`,
+      ? 'blue' // Highlight the selected seat in blue
+      : status === 'booked'
+      ? 'red' // Set booked seats to red
+      : `rgb(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)})`, // Default color for available seats
   };
 
   return (
     <TouchableOpacity
       style={seatStyle}
-      onPress={() => onSeatSelect(id)}
-      activeOpacity={0.7}
+      onPress={() => onSeatSelect(id, status)}
+      activeOpacity={status === 'booked' ? 1 : 0.7}
+      disabled={status === 'booked'}
     >
       {/* <Text style={styles.text}>{id}</Text> */}
     </TouchableOpacity>

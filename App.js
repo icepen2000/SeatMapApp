@@ -3,13 +3,14 @@ import { SafeAreaView, View, Text } from 'react-native';
 import SeatMap from './components/SeatMap';
 import { WebSocketProvider } from './components/WebSocket';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { getBackendUrl } from './config';
 
 const App = () => {
   const [sectionsData, setSectionsData] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('http://34.238.103.127:8090/api/seatmap')
+    fetch(`${getBackendUrl()}/api/seatmap`)
       .then(response => {
         if (response.ok) {
           return response.json();
@@ -18,7 +19,7 @@ const App = () => {
       })
       .then(data => {
         setSectionsData(data);
-        console.log('Seat map data loaded from Amazon S3:', data);
+        console.log('Seat map data loaded from Amazon S3.');
       })
       .catch(error => {
         console.error('Failed to fetch seat map data:', error);

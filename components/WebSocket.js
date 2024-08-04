@@ -1,16 +1,18 @@
-// components/WebSocket.js
 import React, { useEffect, useState, createContext, useContext } from 'react';
+import { getWebSocketUrl } from '../config';
 
 // Creating a WebSocket Context
 export const WebSocketContext = createContext(null);
 
-export const WebSocketProvider = ({ children }) => {
+export const WebSocketProvider = ({ children, updateSeatMapState  }) => {
     const [websocket, setWebsocket] = useState(null);
     const [error, setError] = useState(null);
 
     useEffect(() => {
         function connect() {
-            const ws = new WebSocket('ws://34.238.103.127:8090/ws');
+            const wsUrl = getWebSocketUrl();
+            console.log('WebSocket URL:', wsUrl);
+            const ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
                 console.log('WebSocket connected');
@@ -19,13 +21,17 @@ export const WebSocketProvider = ({ children }) => {
 
             ws.onmessage = (event) => {
                 console.log('Message from server ', event.data);
-                // Here you could handle messages
+                const updatedSeat = JSON.parse(event.data);
+                // Update the seat map state with the new status
+                if (updateSeatMapState) {
+                    updateSeatMapState(updatedSeat);
+                }
             };
 
             ws.onclose = (event) => {
                 console.log('WebSocket disconnected', event);
                 if(!event.wasClean){
-                    setError("Connection lost. Reconnecting...');")
+                    setError("Connection lost. Reconnecting...");
                 }
                 console.log('Reconnect will be attempted in 1 second.');
                 setTimeout(() => {
@@ -49,7 +55,7 @@ export const WebSocketProvider = ({ children }) => {
                 websocket.close();
             }
         };
-    }, []);
+    }, [updateSeatMapState]);
 
     return (
         <WebSocketContext.Provider value={{ websocket, error }}>
