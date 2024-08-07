@@ -208,11 +208,40 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
       })
       .then(data => {
         Alert.alert('Purchase Successful', 'Seats have been booked successfully.');
+        const updatedSeat = {
+          sectionId: payload.sectionId,
+          rowNumber: payload.rowNumber,
+          seatNumber: payload.seatNumber,
+          status: 'booked'
+        };
+        updateSeatMapState(updatedSeat);
         setSelectedSeats([]);
       })
       .catch(error => {
         console.error('Failed to update seat status:', error);
         Alert.alert('Purchase Failed', 'Failed to book seats. Please try again later.');
+      });
+  };
+
+  const handleRefresh = () => {
+    console.log(`${new Date().toISOString()} - Refresh Start`);
+    fetch(`${getBackendUrl()}/api/seatmap`)
+      .then(response => {
+        if (response.ok) {
+          console.log(`${new Date().toISOString()} - Refresh Response OK`);
+          return response.json();
+        }
+        throw new Error('Failed to refresh data');
+      })
+      .then(data => {
+        console.log(`${new Date().toISOString()} - Refresh Data Set Start`);
+        setSelectedSeats([]);
+        setSeatMapData(data.sections);
+        console.log(`${new Date().toISOString()} - Refresh Data Set End`);
+      })
+      .catch(error => {
+        console.error('Failed to refresh seat map data:', error);
+        setError('Failed to refresh seat map. Please try again later.');
       });
   };
 
@@ -272,6 +301,7 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
       </PinchGestureHandler>
       <View style={styles.purchaseButtonContainer}>
         <Button title="PURCHASE" onPress={handlePurchase} />
+        <Button title="REFRESH" onPress={handleRefresh} />
       </View>
     </GestureHandlerRootView>
   );
@@ -309,7 +339,12 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 0,
     right: 0,
+    marginLeft: windowWidth/4,
+    marginRight: windowWidth/4,
+    alignSelf : 'center',
     alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: 'space-between',
   },
 });
 
