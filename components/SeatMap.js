@@ -188,6 +188,11 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
   }, [seatMapData, nonSeats]);
 
   const handlePurchase = () => {
+    if(selectedSeats.length == 0){
+      Alert.alert('Please select a seat.');
+      return;
+    }
+
     const payload = selectedSeats.map(seatId => {
       const [sectionId, rowNumber, seatNumber] = seatId.split('-');
       return { sectionId, rowNumberSeatNumber: `${rowNumber}_${seatNumber}`, status: 'booked', price: 150 }; // Add price if needed
