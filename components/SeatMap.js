@@ -1,8 +1,9 @@
-import React, { useRef, useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { memo, useRef, useState, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableWithoutFeedback, Button, Alert } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, useAnimatedGestureHandler, withSpring, runOnJS } from 'react-native-reanimated';
 import { PanGestureHandler, PinchGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Seat from './Seat';
+import SeatItem from './SeatItem';
 import { useWebSocket } from './WebSocket';
 import { getBackendUrl } from '../config'; // Import the getBackendUrl function
 
@@ -25,6 +26,8 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
   const [contentWidth, setContentWidth] = useState(windowWidth * 3);
   const [contentHeight, setContentHeight] = useState(windowHeight * 2);
   const { websocket } = useWebSocket();
+
+  const seatRefs = useRef({});
 
   const pinchGestureHandler = useAnimatedGestureHandler({
     onStart: (_, ctx) => {
@@ -72,7 +75,20 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
     };
   });
 
-  const handleSeatSelect = useCallback((sectionId, rowNumber, seatNumber, status) => {
+  const handleSeatSelect = (sectionId, rowNumber, seatNumber, status) => {
+    console.log(`${new Date().toISOString()} - Touch start at seat: ${sectionId}-${rowNumber}-${seatNumber}`);
+    updateSelectedSeats(sectionId, rowNumber, seatNumber, status);
+
+    const refKey = `${sectionId}-${rowNumber}-${seatNumber}`;
+    const seatRef = seatRefs.current[refKey]?.current;
+    if (seatRef && seatRef.setNativeProps) {
+      const isSelected = selectedSeats.includes(refKey);
+      const newBackgroundColor = isSelected ? 'blue' : calculateSeatStyle(seatRefs.current[refKey].geometry, status).backgroundColor;
+      seatRef.setNativeProps({ style: { backgroundColor: newBackgroundColor } });
+    }
+  };
+
+  const updateSelectedSeats = useCallback((sectionId, rowNumber, seatNumber, status) => {
     const seatId = `${sectionId}-${rowNumber}-${seatNumber}`;
 
     if (status !== 'booked') {
@@ -97,7 +113,7 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
     );
 
     if (distance < TOUCH_THRESHOLD) {
-      handleSeatSelect(sectionId, rowNumber, seatNumber, status);
+      updateSelectedSeats(sectionId, rowNumber, seatNumber, status);
     }
   };
 
@@ -128,7 +144,8 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
     });
   }, []);
 
-  const calculateSeatStyle = useCallback((geometry, sectionId, rowNumber, seatNumber, status) => {
+  const calculateSeatStyle = useCallback((geometry, status) => {
+    console.log("==== calculateSeatStyle");
     if (!geometry) {
       return {};
     }
@@ -141,9 +158,9 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
       width: width,
       height: height,
       transform: [{ rotate: `${rotation}rad` }],
-      backgroundColor: selectedSeats.includes(`${sectionId}-${rowNumber}-${seatNumber}`) ? 'blue' : backgroundColor,
+      backgroundColor,
     };
-  }, [selectedSeats]);
+  }, []);
 
   const calculateNonSeatStyle = useCallback((geometry) => {
     if (!geometry) {
@@ -284,28 +301,28 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
                 <View key={section.sectionId}>
                   {section.rows.map((row) => (
                     <View key={row.rowNumber}>
-                      {row.seats.map((seat) => (
-                        <Animated.View
-                          key={`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`}
-                          style={calculateSeatStyle(seat.geometry, section.sectionId, row.rowNumber, seat.seatNumber, seat.status)}
-                          onTouchStart={() => {
-                            console.log(`Touch start at seat: ${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`);
-                            handleSeatSelect(section.sectionId, row.rowNumber, seat.seatNumber, seat.status);
-                          }}
-                        >
-                          <Seat
-                            id={`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`}
-                            price={seat.price}
-                            status={seat.status}
-                            geometry={seat.geometry}
-                            selected={selectedSeats.includes(`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`)}
+                      {row.seats.map((seat) => {
+                        const refKey = `${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`;
+                        const isSelected = selectedSeats.includes(refKey);
+
+                        return (
+                          <SeatItem
+                            key={refKey}
+                            sectionId={section.sectionId}
+                            rowNumber={row.rowNumber}
+                            seat={seat}
+                            isSelected={isSelected}
+                            handleSeatSelect={handleSeatSelect}
+                            calculateSeatStyle={calculateSeatStyle}
+                            seatRefs={seatRefs}
                           />
-                        </Animated.View>
-                      ))}
+                        );
+                      })}
                     </View>
                   ))}
                 </View>
               ))}
+
             </Animated.View>
           </PanGestureHandler>
         </Animated.View>
