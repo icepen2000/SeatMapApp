@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SafeAreaView, View, Text } from 'react-native';
 import SeatMap from './components/SeatMap';
 import { WebSocketProvider } from './components/WebSocket';
@@ -6,10 +6,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getBackendUrl } from './config';
 
 const App = () => {
+  const seatMapRef = useRef();
+
   const [sectionsData, setSectionsData] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    console.log(`${new Date().toISOString()} - SUNI APP Requested the seat map data`);
     fetch(`${getBackendUrl()}/api/seatmap`)
       .then(response => {
         if (response.ok) {
@@ -18,8 +21,9 @@ const App = () => {
         throw new Error('Failed to fetch data');
       })
       .then(data => {
+        console.log(`${new Date().toISOString()} - SUNI APP Received the seat map data from backend`);
         setSectionsData(data);
-        console.log('Seat map data loaded from Amazon S3.');
+        console.log(`${new Date().toISOString()} - SUNI APP Seat map data loaded from Amazon S3`);
       })
       .catch(error => {
         console.error('Failed to fetch seat map data:', error);
@@ -28,11 +32,12 @@ const App = () => {
   }, []);
 
   return (
-    <WebSocketProvider>
+    <WebSocketProvider updateSeatMapState={(newState) => seatMapRef.current.updateSeatMapState(newState)}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
           {sectionsData ? (
             <SeatMap
+              ref={seatMapRef}
               venueName={sectionsData.venueName}
               sections={sectionsData.sections}
               nonSeats={sectionsData.nonSeats}

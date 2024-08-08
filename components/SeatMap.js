@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableWithoutFeedback, Button, Alert } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, useAnimatedGestureHandler, withSpring, runOnJS } from 'react-native-reanimated';
 import { PanGestureHandler, PinchGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,7 +13,7 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 2;
 const TOUCH_THRESHOLD = 15; // 터치와 제스처를 구분하기 위한 임계값 (픽셀 단위)
 
-const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
+const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) => {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [seatMapData, setSeatMapData] = useState(sections); // Define seatMapData state
   const [lastScale, setLastScale] = useState(1);
@@ -208,13 +208,16 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
       })
       .then(data => {
         Alert.alert('Purchase Successful', 'Seats have been booked successfully.');
-        const updatedSeat = {
-          sectionId: payload.sectionId,
-          rowNumber: payload.rowNumber,
-          seatNumber: payload.seatNumber,
-          status: 'booked'
-        };
-        updateSeatMapState(updatedSeat);
+        selectedSeats.map(seatId => {
+          const [sectionId, rowNumber, seatNumber] = seatId.split('-');
+          const updatedSeat = {
+            sectionId,
+            rowNumber,
+            seatNumber,
+            status: 'booked'
+          };
+          updateSeatMapState(updatedSeat);
+        });
         setSelectedSeats([]);
       })
       .catch(error => {
@@ -244,6 +247,10 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
         setError('Failed to refresh seat map. Please try again later.');
       });
   };
+
+  useImperativeHandle(ref, () => ({
+    updateSeatMapState,
+  }));
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -287,7 +294,6 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
                             status={seat.status}
                             geometry={seat.geometry}
                             selected={selectedSeats.includes(`${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`)}
-                            onSeatSelect={() => handleSeatSelect(section.sectionId, row.rowNumber, seat.seatNumber, seat.status)}
                           />
                         </Animated.View>
                       ))}
@@ -305,7 +311,7 @@ const SeatMap = ({ venueName, sections = [], nonSeats = [] }) => {
       </View>
     </GestureHandlerRootView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
