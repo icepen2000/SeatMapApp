@@ -2,10 +2,8 @@ import React, { memo, useRef, useState, useEffect, useCallback, useImperativeHan
 import { View, Text, StyleSheet, Dimensions, TouchableWithoutFeedback, Button, Alert } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, useAnimatedGestureHandler, withSpring, runOnJS } from 'react-native-reanimated';
 import { PanGestureHandler, PinchGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Seat from './Seat';
 import SeatItem from './SeatItem';
 import { useWebSocket } from './WebSocket';
-import { getBackendUrl } from '../config'; // Import the getBackendUrl function
 
 const windowWidth = Dimensions.get('window').width;
 const windowHeight = Dimensions.get('window').height;
@@ -13,8 +11,9 @@ const windowHeight = Dimensions.get('window').height;
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2;
 const TOUCH_THRESHOLD = 15; // 터치와 제스처를 구분하기 위한 임계값 (픽셀 단위)
+const ZOOM_THRESHOLD = 1.5; // Zoom level to switch to seat map
 
-const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) => {
+const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn }, ref) => {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [seatMapData, setSeatMapData] = useState(sections); // Define seatMapData state
   const [lastScale, setLastScale] = useState(1);
@@ -26,27 +25,59 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
   const [contentWidth, setContentWidth] = useState(windowWidth * 3);
   const [contentHeight, setContentHeight] = useState(windowHeight * 2);
   const { websocket } = useWebSocket();
-
   const seatRefs = useRef({});
 
+  // State management for opacity
+  const [seatMapVisible, setSeatMapVisible] = useState(false);
+  const sectionMapOpacity = useSharedValue(1);
+  const seatMapOpacity = useSharedValue(0);
+
+  // Handle pinch gesture for zooming
   const pinchGestureHandler = useAnimatedGestureHandler({
     onStart: (_, ctx) => {
+      'worklet';
       console.log('pinch gesture started');
       ctx.startScale = scale.value;
     },
     onActive: (event, ctx) => {
-       console.log(`Pinch gesture active - Scale: ${event.scale}`);
-       scale.value = Math.min(Math.max(ctx.startScale * event.scale, MIN_SCALE), MAX_SCALE);
+      'worklet';
+      console.log(`Pinch gesture active - Scale: ${event.scale}`);
+      scale.value = Math.min(Math.max(ctx.startScale * event.scale, MIN_SCALE), MAX_SCALE);
+
+      if (scale.value > ZOOM_THRESHOLD) {
+        sectionMapOpacity.value = withSpring(0, { stiffness: 100, damping: 15 });
+        seatMapOpacity.value = withSpring(1, { stiffness: 100, damping: 15 });
+      } else {
+        sectionMapOpacity.value = withSpring(1, { stiffness: 100, damping: 15 });
+        seatMapOpacity.value = withSpring(0, { stiffness: 100, damping: 15 });
+      }
     },
     onEnd: () => {
+      'worklet';
       console.log('pinch gesture ended');
       if (scale.value < 1) {
         scale.value = withSpring(1, { stiffness: 100, damping: 15 });
         runOnJS(setLastScale)(1);
       } else {
         runOnJS(setLastScale)(scale.value);
+        if (scale.value > ZOOM_THRESHOLD && !seatMapVisible) {
+          onZoomIn(); // Notify parent to switch to seat map
+          runOnJS(setSeatMapVisible)(true); // Update seatMapVisible state
+        }
       }
     }
+  });
+
+  const sectionMapStyle = useAnimatedStyle(() => {
+    return {
+      opacity: sectionMapOpacity.value,
+    };
+  });
+
+  const seatMapStyle = useAnimatedStyle(() => {
+    return {
+      opacity: seatMapOpacity.value,
+    };
   });
 
   const panGestureHandler = useAnimatedGestureHandler({
@@ -77,10 +108,12 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
 
   const handleSeatSelect = (sectionId, rowNumber, seatNumber, status) => {
     console.log(`${new Date().toISOString()} - Touch start at seat: ${sectionId}-${rowNumber}-${seatNumber}`);
-    updateSelectedSeats(sectionId, rowNumber, seatNumber, status);
 
     const refKey = `${sectionId}-${rowNumber}-${seatNumber}`;
     const seatRef = seatRefs.current[refKey]?.current;
+
+    updateSelectedSeats(sectionId, rowNumber, seatNumber, status);
+
     if (seatRef && seatRef.setNativeProps) {
       const isSelected = selectedSeats.includes(refKey);
       const newBackgroundColor = isSelected ? 'blue' : calculateSeatStyle(seatRefs.current[refKey].geometry, status).backgroundColor;
@@ -205,7 +238,7 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
   }, [seatMapData, nonSeats]);
 
   const handlePurchase = () => {
-    if(selectedSeats.length == 0){
+    if (selectedSeats.length === 0) {
       Alert.alert('Please select a seat.');
       return;
     }
@@ -280,53 +313,61 @@ const SeatMap = forwardRef(({ venueName, sections = [], nonSeats = [] }, ref) =>
         <Animated.View style={[styles.container, animatedStyle]}>
           <PanGestureHandler onGestureEvent={panGestureHandler}>
             <Animated.View style={[styles.mapContainer, { width: contentWidth * lastScale, height: contentHeight * lastScale }]}>
-              <TouchableWithoutFeedback onPress={(e) => {
-                console.log('Map touched at', e.nativeEvent.locationX, e.nativeEvent.locationY);
-              }}>
-                <View style={[styles.touchLayer, { width: contentWidth * lastScale, height: contentHeight * lastScale }]} />
-              </TouchableWithoutFeedback>
 
-              {nonSeats.map((nonSeat, index) => (
-                <View
-                  key={index}
-                  style={calculateNonSeatStyle(nonSeat.geometry)}
-                >
-                  {nonSeat.name ? (
-                    <Text style={styles.nonSeatLabel}>{nonSeat.name}</Text>
-                  ) : null}
-                </View>
-              ))}
+              {/* Section Map */}
+              <Animated.View style={[sectionMapStyle, { opacity: seatMapVisible ? 0 : 1 }]}>
+                <TouchableWithoutFeedback onPress={(e) => {
+                  console.log('Map touched at', e.nativeEvent.locationX, e.nativeEvent.locationY);
+                }}>
+                  <View style={[styles.touchLayer, { width: contentWidth * lastScale, height: contentHeight * lastScale }]} />
+                </TouchableWithoutFeedback>
 
-              {seatMapData.map((section) => (
-                <View key={section.sectionId}>
-                  {section.rows.map((row) => (
-                    <View key={row.rowNumber}>
-                      {row.seats.map((seat) => {
-                        const refKey = `${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`;
-                        const isSelected = selectedSeats.includes(refKey);
+                {nonSeats.map((nonSeat, index) => (
+                  <View
+                    key={index}
+                    style={calculateNonSeatStyle(nonSeat.geometry)}
+                  >
+                    {nonSeat.name ? (
+                      <Text style={styles.nonSeatLabel}>{nonSeat.name}</Text>
+                    ) : null}
+                  </View>
+                ))}
+              </Animated.View>
 
-                        return (
-                          <SeatItem
-                            key={refKey}
-                            sectionId={section.sectionId}
-                            rowNumber={row.rowNumber}
-                            seat={seat}
-                            isSelected={isSelected}
-                            handleSeatSelect={handleSeatSelect}
-                            calculateSeatStyle={calculateSeatStyle}
-                            seatRefs={seatRefs}
-                          />
-                        );
-                      })}
-                    </View>
-                  ))}
-                </View>
-              ))}
+              {/* Seat Map */}
+              <Animated.View style={[seatMapStyle, { opacity: seatMapVisible ? 1 : 0 }]}>
+                {seatMapData.map((section) => (
+                  <View key={section.sectionId}>
+                    {section.rows.map((row) => (
+                      <View key={row.rowNumber}>
+                        {row.seats.map((seat) => {
+                          const refKey = `${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`;
+                          const isSelected = selectedSeats.includes(refKey);
+
+                          return (
+                            <SeatItem
+                              key={refKey}
+                              sectionId={section.sectionId}
+                              rowNumber={row.rowNumber}
+                              seat={seat}
+                              isSelected={isSelected}
+                              handleSeatSelect={handleSeatSelect}
+                              calculateSeatStyle={calculateSeatStyle}
+                              seatRefs={seatRefs}
+                            />
+                          );
+                        })}
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </Animated.View>
 
             </Animated.View>
           </PanGestureHandler>
         </Animated.View>
       </PinchGestureHandler>
+
       <View style={styles.purchaseButtonContainer}>
         <Button title="PURCHASE" onPress={handlePurchase} />
         <Button title="REFRESH" onPress={handleRefresh} />
@@ -367,11 +408,11 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 0,
     right: 0,
-    marginLeft: windowWidth/4,
-    marginRight: windowWidth/4,
-    alignSelf : 'center',
+    marginLeft: windowWidth / 4,
+    marginRight: windowWidth / 4,
+    alignSelf: 'center',
     alignItems: 'center',
-    flexDirection: "row",
+    flexDirection: 'row',
     justifyContent: 'space-between',
   },
 });

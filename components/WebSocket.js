@@ -1,67 +1,71 @@
 import React, { useEffect, useState, createContext, useContext } from 'react';
 import { getWebSocketUrl } from '../config';
 
-// Creating a WebSocket Context
 export const WebSocketContext = createContext(null);
 
-export const WebSocketProvider = ({ children, updateSeatMapState  }) => {
-    const [websocket, setWebsocket] = useState(null);
-    const [error, setError] = useState(null);
+export const WebSocketProvider = React.memo(({ children, updateSeatMapState }) => {
+  const [websocket, setWebsocket] = useState(null);
+  const [error, setError] = useState(null);
 
-    useEffect(() => {
-        function connect() {
-            const wsUrl = getWebSocketUrl();
-            console.log('WebSocket URL:', wsUrl);
-            const ws = new WebSocket(wsUrl);
+  useEffect(() => {
+    console.log('WebSocketProvider mounted');
+    let ws;
 
-            ws.onopen = () => {
-                console.log('WebSocket connected');
-                setError(null); // Clear any errors on successful connection
-            };
+    const connect = () => {
+      const wsUrl = getWebSocketUrl();
+      console.log('WebSocket URL:', wsUrl);
+      ws = new WebSocket(wsUrl);
 
-            ws.onmessage = (event) => {
-                console.log('Message from server ', event.data);
-                const updatedSeat = JSON.parse(event.data);
-                // Update the seat map state with the new status
-                if (updateSeatMapState) {
-                    updateSeatMapState(updatedSeat);
-                }
-            };
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        setError(null);
+      };
 
-            ws.onclose = (event) => {
-                console.log('WebSocket disconnected', event);
-                if(!event.wasClean){
-                    setError("Connection lost. Reconnecting...");
-                }
-                console.log('Reconnect will be attempted in 1 second.');
-                setTimeout(() => {
-                    connect();
-                }, 1000);
-            };
-
-            ws.onerror = (error) => {
-                console.error('WebSocket error', error);
-                setError('WebSocket error: ' + error.message);
-                ws.close();
-            };
-
-            setWebsocket(ws);
+      ws.onmessage = (event) => {
+        console.log('Message from server ', event.data);
+        const updatedSeat = JSON.parse(event.data);
+        if (updateSeatMapState) {
+          updateSeatMapState(updatedSeat);
         }
+      };
 
-        connect();
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected', event);
+        if (!event.wasClean) {
+          setError("Connection lost. Reconnecting...");
+          console.log('Reconnect will be attempted in 1 second.');
+          setTimeout(() => {
+            connect();
+          }, 1000);
+        } else {
+          console.log('WebSocket connection closed cleanly');
+        }
+      };
 
-        return () => {
-            if (websocket) {
-                websocket.close();
-            }
-        };
-    }, [updateSeatMapState]);
+      ws.onerror = (error) => {
+        console.error('WebSocket error', error);
+        setError('WebSocket error: ' + error.message);
+        ws.close();
+      };
 
-    return (
-        <WebSocketContext.Provider value={{ websocket, error }}>
-            {children}
-        </WebSocketContext.Provider>
-    );
-};
+      setWebsocket(ws);
+    };
+
+    connect();
+
+    return () => {
+      console.log('WebSocketProvider unmounted');
+      if (ws) {
+        ws.close(1000, 'Component unmounting');
+      }
+    };
+  }, [updateSeatMapState]);
+
+  return (
+    <WebSocketContext.Provider value={{ websocket, error }}>
+      {children}
+    </WebSocketContext.Provider>
+  );
+});
 
 export const useWebSocket = () => useContext(WebSocketContext);

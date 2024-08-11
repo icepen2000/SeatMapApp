@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SafeAreaView, View, Text } from 'react-native';
 import SeatMap from './components/SeatMap';
 import { WebSocketProvider } from './components/WebSocket';
@@ -6,45 +6,89 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getBackendUrl } from './config';
 
 const App = () => {
+  console.log('Rendering App Component');
+
   const seatMapRef = useRef();
 
-  const [sectionsData, setSectionsData] = useState(null);
+  const [mapData, setMapData] = useState(null);
+  const [seatMapData, setSeatMapData] = useState(null);
+  const [mapType, setMapType] = useState('sectionMap');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    console.log(`${new Date().toISOString()} - SUNI APP Requested the seat map data`);
-    fetch(`${getBackendUrl()}/api/seatmap`)
+  const fetchMapData = useCallback((type, isBackground = false) => {
+    console.log(`Fetching ${type} data from the backend...`);
+    fetch(`${getBackendUrl()}/api/map?type=${type}`)
       .then(response => {
+        console.log(`Response status: ${response.status}`);
         if (response.ok) {
           return response.json();
         }
         throw new Error('Failed to fetch data');
       })
       .then(data => {
-        console.log(`${new Date().toISOString()} - SUNI APP Received the seat map data from backend`);
-        setSectionsData(data);
-        console.log(`${new Date().toISOString()} - SUNI APP Seat map data loaded from Amazon S3`);
+        console.log(`${type} data fetched successfully:`);
+        if (type === 'sectionMap') {
+          console.log('Updating mapData and mapType state');
+          setMapData(data);
+          setMapType(type);
+          fetchMapData('seatMap', true);
+        } else if (type === 'seatMap') {
+          console.log('Updating seatMapData state');
+          setSeatMapData(data.sections);
+          if (!isBackground) {
+            console.log('Updating mapType state');
+            setMapType(type);
+          }
+        }
       })
       .catch(error => {
-        console.error('Failed to fetch seat map data:', error);
-        setError('Failed to load seat map. Please try again later.');
+        console.error(`Failed to fetch ${type} data:`, error);
+        console.log('Updating error state');
+        setError(`Failed to load ${type}. Please try again later.`);
       });
   }, []);
 
+  const updateSeatMapState = useCallback((newState) => {
+    if (seatMapRef.current) {
+      seatMapRef.current.updateSeatMapState(newState);
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log('App component mounted');
+    fetchMapData('sectionMap', false);
+  }, [fetchMapData]);
+
+  const handleZoomIn = useCallback(() => {
+    if (mapType === 'sectionMap' && seatMapData) {
+      console.log('Zooming in and switching to seatMap');
+      setMapType('seatMap');
+    }
+  }, [mapType, seatMapData]);
+
+  useEffect(() => {
+    console.log('App component mounted');
+    return () => {
+      console.log('App component unmounted');
+    };
+  }, []);
+
   return (
-    <WebSocketProvider updateSeatMapState={(newState) => seatMapRef.current.updateSeatMapState(newState)}>
+    <WebSocketProvider updateSeatMapState={updateSeatMapState}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
-          {sectionsData ? (
+          {mapData ? (
             <SeatMap
               ref={seatMapRef}
-              venueName={sectionsData.venueName}
-              sections={sectionsData.sections}
-              nonSeats={sectionsData.nonSeats}
+              venueName={mapData.venueName}
+              sections={mapType === 'seatMap' ? seatMapData : mapData.sections}
+              nonSeats={mapData.nonSeats}
+              onZoomIn={handleZoomIn}
+              mapType={mapType}
             />
           ) : (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Text>{error || 'Loading seat map...'}</Text>
+              <Text>{error || 'Loading map...'}</Text>
             </View>
           )}
         </SafeAreaView>
