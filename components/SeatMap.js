@@ -14,7 +14,7 @@ const MAX_SCALE = 2;
 const TOUCH_THRESHOLD = 15; // 터치와 제스처를 구분하기 위한 임계값 (픽셀 단위)
 const ZOOM_THRESHOLD = 1.5; // Zoom level to switch to seat map
 
-const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn }, ref) => {
+const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn, mapType }, ref) => {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [seatMapData, setSeatMapData] = useState(sections); // Define seatMapData state
   const [lastScale, setLastScale] = useState(1);
@@ -284,7 +284,7 @@ const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn }, ref) =>
 
   const handleRefresh = () => {
     console.log(`${new Date().toISOString()} - Refresh Start`);
-    fetch(`${getBackendUrl()}/api/seatmap`)
+    fetch(`${getBackendUrl()}/api/map?type=${mapType}`)
       .then(response => {
         if (response.ok) {
           console.log(`${new Date().toISOString()} - Refresh Response OK`);
@@ -306,6 +306,7 @@ const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn }, ref) =>
 
   useImperativeHandle(ref, () => ({
     updateSeatMapState,
+    setSeatMapData,
   }));
 
   return (
@@ -336,6 +337,35 @@ const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn }, ref) =>
               </Animated.View>
 
               {/* Seat Map */}
+              { seatMapData.length > 0 ? (
+              <Animated.View style={[seatMapStyle, { opacity: seatMapVisible ? 1 : 0 }]}>
+                {seatMapData.map((section) => (
+                  <View key={section.sectionId}>
+                    {section.rows.map((row) => (
+                      <View key={row.rowNumber}>
+                        {row.seats.map((seat) => {
+                          const refKey = `${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`;
+                          const isSelected = selectedSeats.includes(refKey);
+
+                          return (
+                            <SeatItem
+                              key={refKey}
+                              sectionId={section.sectionId}
+                              rowNumber={row.rowNumber}
+                              seat={seat}
+                              isSelected={isSelected}
+                              handleSeatSelect={handleSeatSelect}
+                              calculateSeatStyle={calculateSeatStyle}
+                              seatRefs={seatRefs}
+                            />
+                          );
+                        })}
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </Animated.View>
+              ) : (
               <Animated.View style={[seatMapStyle, { opacity: seatMapVisible ? 1 : 0 }]}>
                 {sections.map((section) => (
                   <View key={section.sectionId}>
@@ -363,6 +393,7 @@ const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn }, ref) =>
                   </View>
                 ))}
               </Animated.View>
+              )}
 
             </Animated.View>
           </PanGestureHandler>

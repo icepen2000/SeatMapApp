@@ -36,6 +36,7 @@ const App = () => {
         } else if (type === 'seatMap') {
           console.log('Updating seatMapData state');
           setSeatMapData(data.sections);
+          updateSeatMapData(data.sections);
           if (!isBackground) {
             console.log('Updating mapType state');
             setMapType(type);
@@ -52,6 +53,12 @@ const App = () => {
   const updateSeatMapState = useCallback((newState) => {
     if (seatMapRef.current) {
       seatMapRef.current.updateSeatMapState(newState);
+    }
+  }, []);
+
+  const updateSeatMapData = useCallback((sectionData) => {
+    if (seatMapRef.current) {
+      seatMapRef.current.setSeatMapData(sectionData);
     }
   }, []);
 
