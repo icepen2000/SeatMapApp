@@ -4,6 +4,7 @@ import Animated, { useAnimatedStyle, useSharedValue, useAnimatedGestureHandler, 
 import { PanGestureHandler, PinchGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
 import SeatItem from './SeatItem';
 import { useWebSocket } from './WebSocket';
+import { getBackendUrl } from '../config';
 
 const windowWidth = Dimensions.get('window').width;
 const windowHeight = Dimensions.get('window').height;
@@ -87,7 +88,7 @@ const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn }, ref) =>
       ctx.startY = translateY.value;
     },
     onActive: (event, ctx) => {
-      console.log(`Pan gesture active - TranslationX: ${event.translationX}, TranslationY: ${event.translationY}`);
+      //console.log(`Pan gesture active - TranslationX: ${event.translationX}, TranslationY: ${event.translationY}`);
       translateX.value = ctx.startX + event.translationX;
       translateY.value = ctx.startY + event.translationY;
     },
@@ -299,7 +300,7 @@ const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn }, ref) =>
       })
       .catch(error => {
         console.error('Failed to refresh seat map data:', error);
-        setError('Failed to refresh seat map. Please try again later.');
+        //setError('Failed to refresh seat map. Please try again later.');
       });
   };
 
@@ -336,7 +337,7 @@ const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn }, ref) =>
 
               {/* Seat Map */}
               <Animated.View style={[seatMapStyle, { opacity: seatMapVisible ? 1 : 0 }]}>
-                {seatMapData.map((section) => (
+                {sections.map((section) => (
                   <View key={section.sectionId}>
                     {section.rows.map((row) => (
                       <View key={row.rowNumber}>

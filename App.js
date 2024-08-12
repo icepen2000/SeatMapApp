@@ -3,6 +3,7 @@ import { SafeAreaView, View, Text } from 'react-native';
 import SeatMap from './components/SeatMap';
 import { WebSocketProvider } from './components/WebSocket';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { getBackendUrl } from './config';
 
 const App = () => {
@@ -60,9 +61,11 @@ const App = () => {
   }, [fetchMapData]);
 
   const handleZoomIn = useCallback(() => {
+    'worklet';
     if (mapType === 'sectionMap' && seatMapData) {
       console.log('Zooming in and switching to seatMap');
-      setMapType('seatMap');
+      runOnJS(setMapType)('seatMap');
+      //setMapType('seatMap');
     }
   }, [mapType, seatMapData]);
 
