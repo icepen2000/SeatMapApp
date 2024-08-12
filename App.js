@@ -91,7 +91,6 @@ const App = () => {
             <SeatMap
               ref={seatMapRef}
               venueName={mapData.venueName}
-              sections={mapType === 'seatMap' ? seatMapData : mapData.sections}
               nonSeats={mapData.nonSeats}
               onZoomIn={handleZoomIn}
               mapType={mapType}

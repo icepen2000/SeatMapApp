@@ -14,9 +14,9 @@ const MAX_SCALE = 2;
 const TOUCH_THRESHOLD = 15; // 터치와 제스처를 구분하기 위한 임계값 (픽셀 단위)
 const ZOOM_THRESHOLD = 1.5; // Zoom level to switch to seat map
 
-const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn, mapType }, ref) => {
+const SeatMap = forwardRef(({ venueName, nonSeats, onZoomIn, mapType }, ref) => {
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [seatMapData, setSeatMapData] = useState(sections); // Define seatMapData state
+  const [seatMapData, setSeatMapData] = useState([]); // Define seatMapData state
   const [lastScale, setLastScale] = useState(1);
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -46,7 +46,7 @@ const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn, mapType }
       scale.value = Math.min(Math.max(ctx.startScale * event.scale, MIN_SCALE), MAX_SCALE);
 
       if (scale.value > ZOOM_THRESHOLD) {
-        sectionMapOpacity.value = withSpring(0, { stiffness: 100, damping: 15 });
+        sectionMapOpacity.value = withSpring(0.2, { stiffness: 100, damping: 15 });
         seatMapOpacity.value = withSpring(1, { stiffness: 100, damping: 15 });
       } else {
         sectionMapOpacity.value = withSpring(1, { stiffness: 100, damping: 15 });
@@ -317,7 +317,7 @@ const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn, mapType }
             <Animated.View style={[styles.mapContainer, { width: contentWidth * lastScale, height: contentHeight * lastScale }]}>
 
               {/* Section Map */}
-              <Animated.View style={[sectionMapStyle, { opacity: seatMapVisible ? 0 : 1 }]}>
+              <Animated.View style={[sectionMapStyle, { opacity: seatMapVisible ? 0.2 : 1 }]}>
                 <TouchableWithoutFeedback onPress={(e) => {
                   console.log('Map touched at', e.nativeEvent.locationX, e.nativeEvent.locationY);
                 }}>
@@ -337,37 +337,9 @@ const SeatMap = forwardRef(({ venueName, sections, nonSeats, onZoomIn, mapType }
               </Animated.View>
 
               {/* Seat Map */}
-              { seatMapData.length > 0 ? (
+              { seatMapData.length > 0 && (
               <Animated.View style={[seatMapStyle, { opacity: seatMapVisible ? 1 : 0 }]}>
                 {seatMapData.map((section) => (
-                  <View key={section.sectionId}>
-                    {section.rows.map((row) => (
-                      <View key={row.rowNumber}>
-                        {row.seats.map((seat) => {
-                          const refKey = `${section.sectionId}-${row.rowNumber}-${seat.seatNumber}`;
-                          const isSelected = selectedSeats.includes(refKey);
-
-                          return (
-                            <SeatItem
-                              key={refKey}
-                              sectionId={section.sectionId}
-                              rowNumber={row.rowNumber}
-                              seat={seat}
-                              isSelected={isSelected}
-                              handleSeatSelect={handleSeatSelect}
-                              calculateSeatStyle={calculateSeatStyle}
-                              seatRefs={seatRefs}
-                            />
-                          );
-                        })}
-                      </View>
-                    ))}
-                  </View>
-                ))}
-              </Animated.View>
-              ) : (
-              <Animated.View style={[seatMapStyle, { opacity: seatMapVisible ? 1 : 0 }]}>
-                {sections.map((section) => (
                   <View key={section.sectionId}>
                     {section.rows.map((row) => (
                       <View key={row.rowNumber}>
