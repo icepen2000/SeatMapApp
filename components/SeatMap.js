@@ -328,7 +328,7 @@ const SeatMap = forwardRef(({ venueName, nonSeats, onZoomIn, mapType }, ref) => 
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PinchGestureHandler onGestureEvent={pinchGestureHandler} ref={pinchRef}>
         <Animated.View style={[styles.container, animatedStyle]}>
-          <PanGestureHandler onGestureEvent={panGestureHandler} ref={panRef} >
+          <PanGestureHandler onGestureEvent={panGestureHandler} ref={panRef} waitFor={pinchRef}>
             <Animated.View style={[styles.mapContainer, { width: contentWidth * lastScale, height: contentHeight * lastScale }]}>
 
               {/* Section Map */}
