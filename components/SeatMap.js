@@ -15,6 +15,9 @@ const TOUCH_THRESHOLD = 15; // 터치와 제스처를 구분하기 위한 임계
 const ZOOM_THRESHOLD = 1.5; // Zoom level to switch to seat map
 
 const SeatMap = forwardRef(({ venueName, nonSeats, onZoomIn, mapType }, ref) => {
+  const panRef = React.useRef();
+  const pinchRef = React.useRef();
+
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [seatMapData, setSeatMapData] = useState([]); // Define seatMapData state
   const [lastScale, setLastScale] = useState(1);
@@ -108,6 +111,18 @@ const SeatMap = forwardRef(({ venueName, nonSeats, onZoomIn, mapType }, ref) => 
   });
 
   const handleSeatSelect = (sectionId, rowNumber, seatNumber, status) => {
+    console.log("==== SUNI mapType -", mapType, ", lastScale -", lastScale);
+
+    if(mapType === 'sectionMap'){
+      console.log("==== SUNI (sectionMap) Touch Pass");
+      return;
+    }
+
+    if(lastScale < ZOOM_THRESHOLD){
+      console.log("==== SUNI (lastScale) Touch Pass");
+      return;
+    }
+
     console.log(`${new Date().toISOString()} - Touch start at seat: ${sectionId}-${rowNumber}-${seatNumber}`);
 
     const refKey = `${sectionId}-${rowNumber}-${seatNumber}`;
@@ -179,7 +194,7 @@ const SeatMap = forwardRef(({ venueName, nonSeats, onZoomIn, mapType }, ref) => 
   }, []);
 
   const calculateSeatStyle = useCallback((geometry, status) => {
-    console.log("==== calculateSeatStyle");
+    //console.log("==== calculateSeatStyle");
     if (!geometry) {
       return {};
     }
@@ -311,9 +326,9 @@ const SeatMap = forwardRef(({ venueName, nonSeats, onZoomIn, mapType }, ref) => 
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <PinchGestureHandler onGestureEvent={pinchGestureHandler}>
+      <PinchGestureHandler onGestureEvent={pinchGestureHandler} ref={pinchRef}>
         <Animated.View style={[styles.container, animatedStyle]}>
-          <PanGestureHandler onGestureEvent={panGestureHandler}>
+          <PanGestureHandler onGestureEvent={panGestureHandler} ref={panRef} >
             <Animated.View style={[styles.mapContainer, { width: contentWidth * lastScale, height: contentHeight * lastScale }]}>
 
               {/* Section Map */}
